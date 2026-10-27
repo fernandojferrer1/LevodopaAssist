@@ -40,6 +40,10 @@ app.use("/api/patients", patientsRouter);
 app.use("/api/measurements", measurementByIdRouter);
 app.use("/api/comparisons", comparisonByIdRouter);
 
+app.use("/api", (_req, res) => {
+  res.status(404).json({ error: "No encontrado" });
+});
+
 app.use((err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error(err);
   res.status(500).json({ error: "Error interno del servidor" });

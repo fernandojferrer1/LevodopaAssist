@@ -22,7 +22,7 @@ App web para mediciones EMG en pacientes con Parkinson: alta de pacientes, captu
            (Web Serial)   Supabase (Auth + Postgres)
 ```
 
-- **Vercel:** hostea el frontend y el backend como dos services del mismo proyecto (`vercel.json`). El SPA llama `/api/...` en el mismo dominio.
+- **Vercel:** hostea el frontend y el backend como dos services del mismo proyecto (`vercel.json`). El SPA llama `/api/...` en el mismo dominio. El fallback SPA (`/(.*) → /index.html`) vive **dentro** del service `frontend`: con Services el rewrite top-level solo elige el service; sin ese fallback interno, F5 en `/login` u otras rutas de React Router devolvería el 404 de Vercel.
 - **Supabase:** autenticación (JWT) y base de datos compartida. El backend usa la **secret key** (bypasea RLS); el frontend solo la publishable key para Auth.
 - **USB es local:** Web Serial corre en el PC del usuario. El firmware del ESP32 no habla con la nube; la señal viaja navegador → backend → Supabase al guardar.
 
