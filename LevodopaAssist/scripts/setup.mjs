@@ -1,29 +1,23 @@
-import { existsSync, writeFileSync } from "node:fs";
-import { spawnSync } from "node:child_process";
+import { copyFileSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const backendDir = join(root, "webapp", "backend");
 const envPath = join(backendDir, ".env");
+const examplePath = join(backendDir, ".env.example");
 
 if (!existsSync(envPath)) {
-  writeFileSync(envPath, 'DATABASE_URL="file:./dev.db"\nPORT=4000\n');
-  console.log("Creado webapp/backend/.env");
-}
-
-function run(command, args, cwd) {
-  const result = spawnSync(command, args, {
-    cwd,
-    stdio: "inherit",
-    shell: process.platform === "win32",
-  });
-  if (result.status !== 0) {
-    process.exit(result.status ?? 1);
+  if (!existsSync(examplePath)) {
+    console.error("No existe webapp/backend/.env.example");
+    process.exit(1);
   }
+  copyFileSync(examplePath, envPath);
+  console.log("Creado webapp/backend/.env desde .env.example");
+} else {
+  console.log("webapp/backend/.env ya existe");
 }
 
-console.log("Preparando base de datos (Prisma)...");
-run("npx", ["prisma", "migrate", "deploy"], backendDir);
-run("npx", ["prisma", "generate"], backendDir);
-console.log("Listo. Corré: npm run dev");
+console.log("");
+console.log("Completá SUPABASE_URL y SUPABASE_SECRET_KEY en webapp/backend/.env");
+console.log("antes de correr npm run dev.");

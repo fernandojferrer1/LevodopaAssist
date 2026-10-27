@@ -1,4 +1,4 @@
-import { Measurement } from "@prisma/client";
+import type { Measurement } from "../db/types";
 
 export const COMPARISON_METRIC_KEYS = [
   "conNum",
@@ -36,8 +36,6 @@ export function computeComparisonMetrics(
   for (const key of COMPARISON_METRIC_KEYS) {
     const a = measurementA[key];
     const b = measurementB[key];
-    // Las métricas derivadas (decremento/CV/ratio/iemg) pueden ser null: no se pueden calcular
-    // con menos de 2 contracciones detectadas, o sin señal cruda guardada.
     const pctChange = a == null || b == null || a === 0 ? null : ((b - a) / Math.abs(a)) * 100;
     metrics[key] = { a, b, pctChange };
   }
