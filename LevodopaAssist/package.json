@@ -2,7 +2,7 @@
   "name": "levodopa-assist",
   "private": true,
   "version": "1.0.0",
-  "description": "Frontend estático + backend Express (local y Vercel)",
+  "description": "Frontend Vite + backend Express (local y Vercel Services)",
   "engines": {
     "node": "22.x"
   },
@@ -16,13 +16,7 @@
     "build:frontend": "npm run build --prefix webapp/frontend",
     "build": "npm run typecheck:backend && npm run build:frontend"
   },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.97.0",
-    "express": "^5.2.1"
-  },
   "devDependencies": {
-    "@types/express": "^5.0.6",
-    "@types/node": "^26.2.0",
     "concurrently": "^9.2.1",
     "typescript": "^7.0.2"
   }

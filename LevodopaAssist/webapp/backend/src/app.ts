@@ -9,10 +9,10 @@ import { asyncHandler } from "./asyncHandler";
 import "./db/supabase";
 
 /**
- * App Express sin listen — usable en local (index.ts) y como handler serverless (api/index.ts).
+ * App Express sin listen — local (`index.ts`) y Vercel Services (`framework: express`).
  *
- * Rutas montadas bajo /api/... para que coincidan con el path que envía el frontend
- * y con el rewrite de Vercel (req.url conserva /api/...).
+ * Rutas bajo /api/...: el frontend usa fetch('/api...') y el rewrite de Vercel
+ * entrega al service backend el path original (/api/...).
  */
 const app = express();
 
