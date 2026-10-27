@@ -10,7 +10,20 @@
   padding: var(--space-4) var(--space-6);
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
+}
+
+.app-header__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+.app-header__email {
+  font-size: 0.9rem;
+  color: var(--color-text-muted);
 }
 
 .app-header__brand {

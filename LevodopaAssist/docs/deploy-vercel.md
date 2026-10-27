@@ -30,14 +30,27 @@ No hay **bindings**: el SPA llama `fetch('/api...')` desde el navegador (same-or
 
 ### Variables de entorno
 
-Cargar en Production / Preview / Development (aplican al service `backend`):
+Cargar en **Production** y **Preview** (y Development si usás `vercel dev`):
 
-| Nombre | Notas |
-|--------|-------|
-| `SUPABASE_URL` | Sin prefijo `VITE_` |
-| `SUPABASE_SECRET_KEY` | Solo server-side; nunca en el frontend |
+| Nombre | Service | Notas |
+|--------|---------|-------|
+| `SUPABASE_URL` | backend | Sin prefijo `VITE_` |
+| `SUPABASE_SECRET_KEY` | backend | Solo server-side; **nunca** en el frontend |
+| `VITE_SUPABASE_URL` | frontend | Misma URL del proyecto |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | frontend | Publishable key (no la secret) |
+
+Las variables `VITE_*` se **inyectan en el build** del frontend: si las cambiás, hace falta **redeploy** (un redeploy sin rebuild de cache limpia puede no alcanzar; forzá rebuild si no se actualizan).
 
 Tras cambiar env vars, redeploy.
+
+### Usuarios (Supabase Auth)
+
+El signup público está desactivado: solo entran cuentas creadas a mano.
+
+1. Supabase Dashboard → **Authentication → Users → Add user**.
+2. Completá email + contraseña (o “Create user”).
+3. Para **resetear contraseña**: el mismo listado → menú del usuario → **Send password recovery** o **Reset password** / editar usuario según la UI vigente.
+4. En **Authentication → Providers**, dejá Email habilitado; deshabilitá Sign ups / “Allow new users to sign up” si está disponible, para que no haya registro desde la app.
 
 ## Preview / producción
 
@@ -47,31 +60,37 @@ npx vercel          # preview (CLI)
 npx vercel --prod   # production
 ```
 
-Local con services (inyecta bindings si los hubiera):
+Local con services:
 
 ```bash
 npx vercel dev
 # o sin cloud: npx vercel dev -L
 ```
 
-Desarrollo sin Vercel (sigue válido):
+Desarrollo sin Vercel:
 
 ```bash
-npm install && npm run setup   # si falta .env
-npm run dev                    # backend :4000 + Vite :5173
-npm run smoke --prefix webapp/backend
+npm install && npm run setup   # si falta .env del backend
+# frontend: copiá webapp/frontend/.env.example → .env.local
+npm run dev
+npm run smoke --prefix webapp/backend   # solo health + 401s; sin login
 ```
 
 ## Logs
 
 Dashboard → Deployment → **Runtime Logs**. Filtrá por service `backend` o path `/api/...`.  
-Si faltan `SUPABASE_*`, el backend falla al importar `db/supabase.ts` con un mensaje claro.
+Mutaciones loguean `[audit] ISO email=… METHOD url resource=…` (sin datos clínicos).  
+Si faltan `SUPABASE_*` en el backend, falla al importar `db/supabase.ts`.
 
 ## Checklist post-deploy
 
 - [ ] `GET https://<dominio>/api/health` → `{ "status": "ok" }`
-- [ ] Refrescar `/patients/<id>` no da 404 (service frontend)
-- [ ] Crear/listar un paciente
-- [ ] Web Serial en Chrome/Edge (sin `Permissions-Policy` que bloquee `serial`)
+- [ ] Sin cookie/sesión, `/` redirige a `/login`
+- [ ] Login con usuario del dashboard; email incorrecto muestra mensaje en castellano
+- [ ] Crear paciente, listar, abrir detalle
+- [ ] Medición con ESP32 (Chrome/Edge), guardar; si la sesión expirara al guardar, el modal de re-login no pierde la medición
+- [ ] Crear comparación entre dos mediciones
+- [ ] Cerrar sesión y verificar que no se pueda volver atrás a datos
+- [ ] Web Serial sin `Permissions-Policy` que bloquee `serial`
 - [ ] `/api/*` con `Cache-Control: no-store`
 - [ ] `regions` = `pdx1`

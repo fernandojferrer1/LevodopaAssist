@@ -4,6 +4,7 @@ import { measurementsForPatientRouter, measurementByIdRouter } from "./routes/me
 import { comparisonsForPatientRouter, comparisonByIdRouter } from "./routes/comparisons";
 import { pingDatabase } from "./db/patients";
 import { asyncHandler } from "./asyncHandler";
+import { auditMutation, requireAuth } from "./middleware/requireAuth";
 
 // Valida SUPABASE_* al cargar el módulo (en Vercel vienen de Project Settings → Environment Variables).
 import "./db/supabase";
@@ -16,7 +17,6 @@ import "./db/supabase";
  */
 const app = express();
 
-// Same-origin en prod (mismo dominio) y en local (proxy Vite /api → :4000): no hace falta cors().
 app.use(express.json({ limit: "2mb" }));
 
 app.get(
@@ -29,6 +29,10 @@ app.get(
     res.json({ status: "ok" });
   })
 );
+
+// Todo lo demás bajo /api requiere sesión (JWT Bearer).
+app.use("/api", requireAuth);
+app.use("/api", auditMutation);
 
 app.use("/api/patients/:patientId/measurements", measurementsForPatientRouter);
 app.use("/api/patients/:patientId/comparisons", comparisonsForPatientRouter);

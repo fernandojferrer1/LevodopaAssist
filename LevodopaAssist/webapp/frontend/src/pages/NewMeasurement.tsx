@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { api } from "../api/client";
+import { api, UnauthorizedError } from "../api/client";
 import { LiveWaveformChart } from "../charts/LiveWaveformChart";
 import { LiveIndicator } from "../components/LiveIndicator";
+import { ReloginModal } from "../components/ReloginModal";
 import {
   isWebSerialSupported,
   SerialMeasurementSession,
@@ -37,6 +38,7 @@ export function NewMeasurement() {
   const [summary, setSummary] = useState<SummaryFields | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [stalled, setStalled] = useState(false);
+  const [showRelogin, setShowRelogin] = useState(false);
 
   const sessionRef = useRef<SerialMeasurementSession | null>(null);
   const samplesRef = useRef<number[]>([]);
@@ -129,23 +131,57 @@ export function NewMeasurement() {
     setStalled(false);
   }
 
+  async function persistMeasurement() {
+    if (!patientId || !summary) return;
+    const measurement = await api.createMeasurement(patientId, {
+      medicationState,
+      measuredAt: new Date(measuredAt).toISOString(),
+      location: location || null,
+      notes: notes || null,
+      status: "completed",
+      contractions: contractionsRef.current,
+      rawSamples: samplesRef.current,
+      ...summary,
+    });
+    await sessionRef.current?.close();
+    navigate(`/patients/${patientId}/measurements/${measurement.id}`);
+  }
+
   async function handleSave() {
     if (!patientId || !summary) return;
     setStep("saving");
+    setShowRelogin(false);
+    setErrorMessage(null);
     try {
-      const measurement = await api.createMeasurement(patientId, {
-        medicationState,
-        measuredAt: new Date(measuredAt).toISOString(),
-        location: location || null,
-        notes: notes || null,
-        status: "completed",
-        contractions: contractionsRef.current,
-        rawSamples: samplesRef.current,
-        ...summary,
-      });
-      await sessionRef.current?.close();
-      navigate(`/patients/${patientId}/measurements/${measurement.id}`);
+      await persistMeasurement();
     } catch (err) {
+      // samplesRef / summary / contractionsRef se conservan: no se descarta la medición.
+      if (err instanceof UnauthorizedError) {
+        setErrorMessage(
+          "Tu sesión expiró al guardar. Los datos de la medición siguen en memoria: volvé a ingresar para reintentar."
+        );
+        setShowRelogin(true);
+        setStep("results");
+        return;
+      }
+      setErrorMessage(err instanceof Error ? err.message : "No se pudo guardar la medición.");
+      setStep("results");
+    }
+  }
+
+  async function handleReloginSuccess() {
+    setShowRelogin(false);
+    setErrorMessage(null);
+    setStep("saving");
+    try {
+      await persistMeasurement();
+    } catch (err) {
+      if (err instanceof UnauthorizedError) {
+        setErrorMessage("Todavía no se pudo autenticar. Probá de nuevo.");
+        setShowRelogin(true);
+        setStep("results");
+        return;
+      }
       setErrorMessage(err instanceof Error ? err.message : "No se pudo guardar la medición.");
       setStep("results");
     }
@@ -294,6 +330,14 @@ export function NewMeasurement() {
             </button>
           </div>
         </div>
+      )}
+
+      {showRelogin && (
+        <ReloginModal
+          message="Ingresá de nuevo para guardar la medición. Los datos capturados no se pierden."
+          onSuccess={handleReloginSuccess}
+          onCancel={() => setShowRelogin(false)}
+        />
       )}
     </>
   );
