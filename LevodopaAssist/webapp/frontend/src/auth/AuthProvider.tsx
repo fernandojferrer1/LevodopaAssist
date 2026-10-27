@@ -4,12 +4,17 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase, supabaseConfigError } from "./supabase";
 import { setUnauthorizedHandler } from "../api/client";
+import { INACTIVITY_TIMEOUT_MS } from "./sessionConfig";
+import { isMeasurementBusy, onMeasurementBusyChange } from "./measurementBusy";
+import { setSessionEndMessage } from "./sessionEndMessage";
+
 
 type AuthContextValue = {
   session: Session | null;
@@ -24,15 +29,21 @@ type AuthContextValue = {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+const ACTIVITY_EVENTS = ["mousemove", "mousedown", "keydown", "scroll", "touchstart", "click"] as const;
+
 export function AuthProvider({
   children,
   onUnauthorized,
+  onInactivity,
 }: {
   children: ReactNode;
   onUnauthorized: () => void;
+  onInactivity: () => void;
 }) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  const onInactivityRef = useRef(onInactivity);
+  onInactivityRef.current = onInactivity;
 
   useEffect(() => {
     if (!supabase) {
@@ -61,11 +72,74 @@ export function AuthProvider({
 
   useEffect(() => {
     setUnauthorizedHandler(() => {
-      void supabase?.auth.signOut();
+      setSessionEndMessage("Tu sesión expiró, ingresá de nuevo");
       onUnauthorized();
+      void supabase?.auth.signOut();
     });
     return () => setUnauthorizedHandler(null);
   }, [onUnauthorized]);
+
+
+  // Timeout de inactividad (pausado si hay medición en curso / sin guardar).
+  useEffect(() => {
+    if (!session || !supabase) return;
+
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const clearTimer = () => {
+      if (timer !== null) {
+        clearTimeout(timer);
+        timer = null;
+      }
+    };
+
+    const logoutForInactivity = async () => {
+      clearTimer();
+      setSessionEndMessage("Se cerró la sesión por inactividad");
+      onInactivityRef.current();
+      await supabase!.auth.signOut();
+    };
+
+
+    const armTimer = () => {
+      clearTimer();
+      if (isMeasurementBusy()) return;
+      timer = setTimeout(() => {
+        if (isMeasurementBusy()) {
+          // Sigue ocupado: no cerrar; se rearmará al liberar la medición.
+          return;
+        }
+        void logoutForInactivity();
+      }, INACTIVITY_TIMEOUT_MS);
+    };
+
+    const onActivity = () => {
+      if (isMeasurementBusy()) return;
+      armTimer();
+    };
+
+    armTimer();
+
+    for (const evt of ACTIVITY_EVENTS) {
+      window.addEventListener(evt, onActivity, { passive: true });
+    }
+
+    const unsubscribeBusy = onMeasurementBusyChange(() => {
+      if (isMeasurementBusy()) {
+        clearTimer();
+      } else {
+        armTimer();
+      }
+    });
+
+    return () => {
+      clearTimer();
+      unsubscribeBusy();
+      for (const evt of ACTIVITY_EVENTS) {
+        window.removeEventListener(evt, onActivity);
+      }
+    };
+  }, [session]);
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error(supabaseConfigError ?? "Supabase no configurado");

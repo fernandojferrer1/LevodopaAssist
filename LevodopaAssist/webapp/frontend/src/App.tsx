@@ -39,8 +39,15 @@ export default function App() {
     });
   }, [navigate]);
 
+  const onInactivity = useCallback(() => {
+    navigate("/login", {
+      replace: true,
+      state: { message: "Se cerró la sesión por inactividad" },
+    });
+  }, [navigate]);
+
   return (
-    <AuthProvider onUnauthorized={onUnauthorized}>
+    <AuthProvider onUnauthorized={onUnauthorized} onInactivity={onInactivity}>
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route path="/*" element={<AuthenticatedApp />} />

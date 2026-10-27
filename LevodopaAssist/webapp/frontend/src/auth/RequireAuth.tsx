@@ -1,5 +1,6 @@
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "./AuthProvider";
+import { getSessionEndMessage } from "./sessionEndMessage";
 
 export function RequireAuth() {
   const { session, loading, configError } = useAuth();
@@ -18,8 +19,16 @@ export function RequireAuth() {
   }
 
   if (!session) {
-    return <Navigate to="/login" replace state={{ from: location.pathname + location.search }} />;
+    const message = getSessionEndMessage() ?? undefined;
+    return (
+      <Navigate
+        to="/login"
+        replace
+        state={{ from: location.pathname + location.search, message }}
+      />
+    );
   }
 
   return <Outlet />;
 }
+

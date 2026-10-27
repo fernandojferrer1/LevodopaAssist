@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { api, UnauthorizedError } from "../api/client";
+import { setMeasurementBusy } from "../auth/measurementBusy";
 import { LiveWaveformChart } from "../charts/LiveWaveformChart";
 import { LiveIndicator } from "../components/LiveIndicator";
 import { ReloginModal } from "../components/ReloginModal";
@@ -54,9 +55,21 @@ export function NewMeasurement() {
     return () => {
       stopFlushInterval();
       sessionRef.current?.close();
+      setMeasurementBusy(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Pausa el logout por inactividad mientras hay captura en curso o resultados sin guardar.
+  useEffect(() => {
+    const busy =
+      step === "connecting" ||
+      step === "device" ||
+      step === "results" ||
+      step === "saving" ||
+      showRelogin;
+    setMeasurementBusy(busy);
+  }, [step, showRelogin]);
 
   function startFlushInterval() {
     stopFlushInterval();

@@ -1,18 +1,26 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthProvider";
+import { clearSessionEndMessage, getSessionEndMessage } from "../auth/sessionEndMessage";
 
 export function Login() {
   const { session, loading, configError, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = (location.state as { from?: string; message?: string } | null)?.from ?? "/";
-  const expiredMessage = (location.state as { message?: string } | null)?.message;
+  const stateMessage = (location.state as { message?: string } | null)?.message;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(expiredMessage ?? null);
+  const [error, setError] = useState<string | null>(() => stateMessage ?? getSessionEndMessage());
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const message = stateMessage ?? getSessionEndMessage();
+    if (message) setError(message);
+  }, [stateMessage]);
+
+
 
   if (configError) {
     return (
@@ -36,6 +44,7 @@ export function Login() {
     setSubmitting(true);
     try {
       await signIn(email.trim(), password);
+      clearSessionEndMessage();
       navigate(from, { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email o contraseña incorrectos");
