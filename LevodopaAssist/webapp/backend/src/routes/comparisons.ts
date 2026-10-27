@@ -1,74 +1,71 @@
 import { Router } from "express";
-import { prisma } from "../db/client";
+import { asyncHandler } from "../asyncHandler";
+import {
+  createComparison,
+  getComparisonById,
+  getMeasurementRowForCompare,
+  listComparisonsForPatient,
+} from "../db/comparisons";
 import { computeComparisonMetrics } from "../services/comparison";
 
-// Mounted at /api/patients/:patientId/comparisons
 export const comparisonsForPatientRouter = Router({ mergeParams: true });
 
-comparisonsForPatientRouter.get("/", async (req, res) => {
-  const { patientId } = req.params as { patientId: string };
+comparisonsForPatientRouter.get(
+  "/",
+  asyncHandler(async (req, res) => {
+    const { patientId } = req.params as { patientId: string };
+    const comparisons = await listComparisonsForPatient(patientId);
+    // Contrato histórico: metrics parseado; metricsJson también viaja en el objeto.
+    res.json(comparisons);
+  })
+);
 
-  const comparisons = await prisma.comparison.findMany({
-    where: { patientId },
-    orderBy: { createdAt: "desc" },
-    include: { measurementA: true, measurementB: true },
-  });
+comparisonsForPatientRouter.post(
+  "/",
+  asyncHandler(async (req, res) => {
+    const { patientId } = req.params as { patientId: string };
+    const { measurementAId, measurementBId } = req.body ?? {};
 
-  res.json(
-    comparisons.map((c) => ({ ...c, metrics: JSON.parse(c.metricsJson) }))
-  );
-});
+    if (!measurementAId || !measurementBId) {
+      return res.status(400).json({ error: "measurementAId y measurementBId son obligatorios" });
+    }
+    if (measurementAId === measurementBId) {
+      return res.status(400).json({ error: "Elegí dos mediciones distintas para comparar" });
+    }
 
-comparisonsForPatientRouter.post("/", async (req, res) => {
-  const { patientId } = req.params as { patientId: string };
-  const { measurementAId, measurementBId } = req.body ?? {};
+    const [measurementA, measurementB] = await Promise.all([
+      getMeasurementRowForCompare(measurementAId),
+      getMeasurementRowForCompare(measurementBId),
+    ]);
 
-  if (!measurementAId || !measurementBId) {
-    return res.status(400).json({ error: "measurementAId y measurementBId son obligatorios" });
-  }
-  if (measurementAId === measurementBId) {
-    return res.status(400).json({ error: "Elegí dos mediciones distintas para comparar" });
-  }
+    if (!measurementA || !measurementB) {
+      return res.status(404).json({ error: "Alguna de las mediciones no existe" });
+    }
+    if (measurementA.patientId !== patientId || measurementB.patientId !== patientId) {
+      return res.status(400).json({ error: "Ambas mediciones deben pertenecer al paciente" });
+    }
 
-  const [measurementA, measurementB] = await Promise.all([
-    prisma.measurement.findUnique({ where: { id: measurementAId } }),
-    prisma.measurement.findUnique({ where: { id: measurementBId } }),
-  ]);
-
-  if (!measurementA || !measurementB) {
-    return res.status(404).json({ error: "Alguna de las mediciones no existe" });
-  }
-  if (measurementA.patientId !== patientId || measurementB.patientId !== patientId) {
-    return res.status(400).json({ error: "Ambas mediciones deben pertenecer al paciente" });
-  }
-
-  const metrics = computeComparisonMetrics(measurementA, measurementB);
-
-  const comparison = await prisma.comparison.create({
-    data: {
+    const metrics = computeComparisonMetrics(measurementA, measurementB);
+    const comparison = await createComparison({
       patientId,
       measurementAId,
       measurementBId,
-      metricsJson: JSON.stringify(metrics),
-    },
-    include: { measurementA: true, measurementB: true },
-  });
+      metrics,
+    });
 
-  res.status(201).json({ ...comparison, metrics });
-});
+    res.status(201).json(comparison);
+  })
+);
 
-// Mounted at /api/comparisons
 export const comparisonByIdRouter = Router();
 
-comparisonByIdRouter.get("/:id", async (req, res) => {
-  const comparison = await prisma.comparison.findUnique({
-    where: { id: req.params.id },
-    include: { measurementA: true, measurementB: true },
-  });
-
-  if (!comparison) {
-    return res.status(404).json({ error: "Comparación no encontrada" });
-  }
-
-  res.json({ ...comparison, metrics: JSON.parse(comparison.metricsJson) });
-});
+comparisonByIdRouter.get(
+  "/:id",
+  asyncHandler(async (req, res) => {
+    const comparison = await getComparisonById(String(req.params.id));
+    if (!comparison) {
+      return res.status(404).json({ error: "Comparación no encontrada" });
+    }
+    res.json(comparison);
+  })
+);

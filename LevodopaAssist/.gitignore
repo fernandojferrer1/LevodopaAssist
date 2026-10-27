@@ -6,6 +6,23 @@ dist/
 dist-ssr/
 build/
 
+# Vercel
+.vercel/
+
+# Env y secretos (mantener .env.example versionado)
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# SQLite local (legacy / copias)
+*.db
+*.db-journal
+**/dev.db
+**/dev.db-journal
+
 # Snapshot redundante del propio proyecto: 173 MB y duplica lo que ya esta
 # versionado aca. Ademas GitHub rechaza archivos de mas de 100 MB.
 LevodopaAssist*.zip
