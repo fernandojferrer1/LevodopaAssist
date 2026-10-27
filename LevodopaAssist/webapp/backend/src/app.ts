@@ -4,19 +4,19 @@ import { measurementsForPatientRouter, measurementByIdRouter } from "./routes/me
 import { comparisonsForPatientRouter, comparisonByIdRouter } from "./routes/comparisons";
 import { pingDatabase } from "./db/patients";
 import { asyncHandler } from "./asyncHandler";
+import { auditMutation, requireAuth } from "./middleware/requireAuth";
 
 // Valida SUPABASE_* al cargar el módulo (en Vercel vienen de Project Settings → Environment Variables).
 import "./db/supabase";
 
 /**
- * App Express sin listen — usable en local (index.ts) y como handler serverless (api/index.ts).
+ * App Express sin listen — local (`index.ts`) y Vercel Services (`framework: express`).
  *
- * Rutas montadas bajo /api/... para que coincidan con el path que envía el frontend
- * y con el rewrite de Vercel (req.url conserva /api/...).
+ * Rutas bajo /api/...: el frontend usa fetch('/api...') y el rewrite de Vercel
+ * entrega al service backend el path original (/api/...).
  */
 const app = express();
 
-// Same-origin en prod (mismo dominio) y en local (proxy Vite /api → :4000): no hace falta cors().
 app.use(express.json({ limit: "2mb" }));
 
 app.get(
@@ -29,6 +29,10 @@ app.get(
     res.json({ status: "ok" });
   })
 );
+
+// Todo lo demás bajo /api requiere sesión (JWT Bearer).
+app.use("/api", requireAuth);
+app.use("/api", auditMutation);
 
 app.use("/api/patients/:patientId/measurements", measurementsForPatientRouter);
 app.use("/api/patients/:patientId/comparisons", comparisonsForPatientRouter);

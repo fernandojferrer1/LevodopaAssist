@@ -1,19 +1,26 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "framework": null,
-  "installCommand": "npm install",
-  "buildCommand": "npx tsc --noEmit -p webapp/backend/tsconfig.json && npm run build --prefix webapp/frontend",
-  "outputDirectory": "webapp/frontend/dist",
   "regions": ["pdx1"],
-  "functions": {
-    "api/index.ts": {
-      "maxDuration": 30,
-      "includeFiles": "webapp/backend/src/**"
+  "services": {
+    "backend": {
+      "root": "webapp/backend",
+      "framework": "express",
+      "entrypoint": "src/app.ts"
+    },
+    "frontend": {
+      "root": "webapp/frontend",
+      "framework": "vite"
     }
   },
   "rewrites": [
-    { "source": "/api/(.*)", "destination": "/api" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    {
+      "source": "/api/(.*)",
+      "destination": { "service": "backend" }
+    },
+    {
+      "source": "/(.*)",
+      "destination": { "service": "frontend" }
+    }
   ],
   "headers": [
     {

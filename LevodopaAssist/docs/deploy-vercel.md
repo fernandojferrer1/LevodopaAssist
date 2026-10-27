@@ -1,27 +1,17 @@
-# Deploy en Vercel (frontend estático + API Express)
+# Deploy en Vercel (Services: frontend + backend)
 
-Un solo proyecto Vercel sirve:
+Un solo proyecto Vercel con **dos services** ([docs](https://vercel.com/docs/services)):
 
-- el build de Vite (`webapp/frontend/dist`) en el dominio raíz;
-- el backend Express como **una** Serverless Function en `/api/*` (`api/index.ts`).
+| Service    | Root                 | Framework | Público        |
+|------------|----------------------|-----------|----------------|
+| `backend`  | `webapp/backend`     | Express   | `/api/*`       |
+| `frontend` | `webapp/frontend`    | Vite      | `/*` (resto)   |
 
-## Diferencia con la doc “Express zero-config”
+No hay **bindings**: el SPA llama `fetch('/api...')` desde el navegador (same-origin). El backend recibe el path completo (`/api/patients`, etc.).
 
-La documentación actual de Vercel para Express ([Express on Vercel](https://vercel.com/docs/frameworks/backend/express)) recomienda exportar la app desde `app.ts` / `server.ts` en la raíz **sin** carpeta `api/` ni rewrites: toda la app es Express.
+## Región
 
-Ese modelo **no sirve** para este repo: necesitamos SPA (React Router) + API bajo `/api` en el **mismo dominio**, con assets estáticos en CDN. Por eso usamos el modelo híbrido:
-
-- `outputDirectory` = frontend;
-- función en `api/index.ts` que reexporta `webapp/backend/src/app`;
-- rewrites `/api/(.*)` → `/api` y fallback SPA → `/index.html`.
-
-Los mounts de Express siguen siendo `/api/...` (igual que en local), para no tocar el frontend.
-
-## Región de la función (alinear con Supabase)
-
-En `vercel.json`, `regions` está en **`pdx1` (Portland / Oregon)**, alineado con Supabase **us-west-2 (Oregon)**.
-
-Si movés el proyecto de Supabase a otra región, actualizá `regions` en `vercel.json`:
+`regions`: **`pdx1`** (Oregon), alineado con Supabase **us-west-2**.
 
 | Supabase (aprox.) | Vercel `regions` |
 |-------------------|------------------|
@@ -32,67 +22,75 @@ Si movés el proyecto de Supabase a otra región, actualizá `regions` en `verce
 | EU West (Ireland) / eu-west-1 | `dub1` |
 | EU Central (Frankfurt) | `fra1` |
 
-Lista completa: [Vercel regions](https://vercel.com/docs/regions).
+## Configuración en el dashboard
 
-## Configuración del proyecto en el dashboard
-
-1. **Import** del repo Git (root directory = carpeta que contiene `vercel.json` y `api/`, es decir la raíz de `LevodopaAssist`).
-2. **Framework Preset:** Other (en el repo ya está `"framework": null`).
-3. **Build / Output:** los define `vercel.json` (`installCommand`, `buildCommand`, `outputDirectory`). No hace falta override manual salvo debug.
-4. **Node.js:** 22.x (`engines` en `package.json` raíz).
+1. **Import** del repo; **Root Directory** = carpeta `LevodopaAssist` (donde está `vercel.json`).
+2. Framework Preset: lo define cada service (`express` / `vite`); no hace falta override global.
+3. **Node.js:** 22.x (`engines` en `package.json` raíz).
 
 ### Variables de entorno
 
-En **Settings → Environment Variables**, cargar (Production, Preview y Development):
+Cargar en **Production** y **Preview** (y Development si usás `vercel dev`):
 
-| Nombre | Valor | Notas |
-|--------|-------|-------|
-| `SUPABASE_URL` | `https://YOUR_PROJECT.supabase.co` | Sin prefijo `VITE_` |
-| `SUPABASE_SECRET_KEY` | secret key del proyecto | Solo server-side; **nunca** en el frontend |
+| Nombre | Service | Notas |
+|--------|---------|-------|
+| `SUPABASE_URL` | backend | Sin prefijo `VITE_` |
+| `SUPABASE_SECRET_KEY` | backend | Solo server-side; **nunca** en el frontend |
+| `VITE_SUPABASE_URL` | frontend | Misma URL del proyecto |
+| `VITE_SUPABASE_PUBLISHABLE_KEY` | frontend | Publishable key (no la secret) |
 
-No hace falta `PORT` en Vercel.
+Las variables `VITE_*` se **inyectan en el build** del frontend: si las cambiás, hace falta **redeploy** (un redeploy sin rebuild de cache limpia puede no alcanzar; forzá rebuild si no se actualizan).
 
 Tras cambiar env vars, redeploy.
 
-## Deploy de preview desde una rama
+### Usuarios (Supabase Auth)
+
+El signup público está desactivado: solo entran cuentas creadas a mano.
+
+1. Supabase Dashboard → **Authentication → Users → Add user**.
+2. Completá email + contraseña (o “Create user”).
+3. Para **resetear contraseña**: el mismo listado → menú del usuario → **Send password recovery** o **Reset password** / editar usuario según la UI vigente.
+4. En **Authentication → Providers**, dejá Email habilitado; deshabilitá Sign ups / “Allow new users to sign up” si está disponible, para que no haya registro desde la app.
+
+## Preview / producción
 
 ```bash
-git checkout -b feature/mi-cambio
-git push -u origin HEAD
+git push            # Preview por PR/rama si el repo está conectado
+npx vercel          # preview (CLI)
+npx vercel --prod   # production
 ```
 
-Si el proyecto está conectado a GitHub/GitLab, Vercel crea un **Preview Deployment** automático por PR/push.
-
-Con CLI (si está instalada):
+Local con services:
 
 ```bash
-npx vercel        # preview
-npx vercel --prod # production
+npx vercel dev
+# o sin cloud: npx vercel dev -L
 ```
 
-## Logs de la función
+Desarrollo sin Vercel:
 
-1. Dashboard → Deployment → **Logs** / **Runtime Logs**.
-2. Filtrá por path `/api/...` o por el nombre de la función `api/index`.
-3. Si faltan `SUPABASE_*`, el cold start falla al importar `db/supabase.ts` con un error explícito en esos logs.
+```bash
+npm install && npm run setup   # si falta .env del backend
+# frontend: copiá webapp/frontend/.env.example → .env.local
+npm run dev
+npm run smoke --prefix webapp/backend   # solo health + 401s; sin login
+```
+
+## Logs
+
+Dashboard → Deployment → **Runtime Logs**. Filtrá por service `backend` o path `/api/...`.  
+Mutaciones loguean `[audit] ISO email=… METHOD url resource=…` (sin datos clínicos).  
+Si faltan `SUPABASE_*` en el backend, falla al importar `db/supabase.ts`.
 
 ## Checklist post-deploy
 
-- [ ] `GET https://<dominio>/api/health` → `{ "status": "ok" }` (no 503).
-- [ ] Abrir `/` carga la SPA; refrescar `/patients/<id>` no da 404 (fallback SPA).
-- [ ] Crear un paciente y listarlo (mutación + lectura contra Supabase).
-- [ ] En Chrome/Edge de escritorio, Web Serial sigue disponible (no hay `Permissions-Policy` que bloquee `serial`).
-- [ ] Respuestas `/api/*` traen `Cache-Control: no-store`.
-- [ ] Headers globales: `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`.
-- [ ] Confirmar que `regions` en `vercel.json` es `pdx1` (Supabase us-west-2).
-
-## Desarrollo local (sin Vercel)
-
-Sin cambios de flujo:
-
-```bash
-npm install
-npm run setup   # solo si falta .env
-npm run dev     # backend :4000 + Vite :5173 (proxy /api)
-npm run smoke --prefix webapp/backend
-```
+- [ ] `GET https://<dominio>/api/health` → `{ "status": "ok" }`
+- [ ] Sin cookie/sesión, `/` redirige a `/login`
+- [ ] Login con usuario del dashboard; email incorrecto muestra mensaje en castellano
+- [ ] Crear paciente, listar, abrir detalle
+- [ ] Medición con ESP32 (Chrome/Edge), guardar; si la sesión expirara al guardar, el modal de re-login no pierde la medición
+- [ ] Crear comparación entre dos mediciones
+- [ ] Cerrar sesión y verificar que no se pueda volver atrás a datos
+- [ ] Web Serial sin `Permissions-Policy` que bloquee `serial`
+- [ ] `/api/*` con `Cache-Control: no-store`
+- [ ] `regions` = `pdx1`
