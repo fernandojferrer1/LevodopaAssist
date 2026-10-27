@@ -41,7 +41,9 @@ async function request<T>(
   });
 
   if (res.status === 401) {
-    if (!options?.skipAuthRedirect) {
+    // Solo cerrar sesión si realmente mandamos Bearer: un 401 sin token
+    // suele ser carrera post-login (session aún no lista), no un JWT inválido.
+    if (token && !options?.skipAuthRedirect) {
       unauthorizedHandler?.();
     }
     throw new UnauthorizedError();

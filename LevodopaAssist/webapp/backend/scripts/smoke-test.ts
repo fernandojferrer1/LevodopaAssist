@@ -1,9 +1,8 @@
 /**
  * Smoke test de autenticación (sin usuarios reales).
- * Requiere: npm run dev en otra terminal (con .env de Supabase).
+ * Requiere: backend en marcha (`npm run dev`) con SUPABASE_URL y SUPABASE_SECRET_KEY.
  *
- * El recorrido que creaba pacientes/mediciones quedó deshabilitado: ahora la API
- * exige login; ese flujo se prueba a mano desde la UI (ver docs/deploy-vercel.md).
+ * El CRUD con login se prueba a mano desde la UI (ver README.md).
  */
 
 const BASE = process.env.SMOKE_BASE_URL ?? "http://127.0.0.1:4000/api";

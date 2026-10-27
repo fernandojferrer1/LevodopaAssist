@@ -7,7 +7,8 @@ export function Login() {
   const { session, loading, configError, signIn } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = (location.state as { from?: string; message?: string } | null)?.from ?? "/";
+  const rawFrom = (location.state as { from?: string; message?: string } | null)?.from ?? "/";
+  const from = !rawFrom || rawFrom === "/login" ? "/" : rawFrom;
   const stateMessage = (location.state as { message?: string } | null)?.message;
 
   const [email, setEmail] = useState("");
@@ -46,6 +47,7 @@ export function Login() {
       await signIn(email.trim(), password);
       clearSessionEndMessage();
       navigate(from, { replace: true });
+
     } catch (err) {
       setError(err instanceof Error ? err.message : "Email o contraseña incorrectos");
     } finally {

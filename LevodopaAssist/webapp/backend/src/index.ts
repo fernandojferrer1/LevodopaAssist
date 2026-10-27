@@ -7,9 +7,10 @@ app.listen(port, (err?: Error) => {
     console.error(`No se pudo abrir el puerto ${port}: ${err.message}`);
     if ((err as NodeJS.ErrnoException).code === "EADDRINUSE") {
       console.error(
-        `Otro programa ya usa el puerto ${port}. Cerralo o ejecuta diagnostico.cmd para ver cuál es.`
+        `Otro programa ya usa el puerto ${port}. Cerralo ese proceso o cambiá PORT en webapp/backend/.env.`
       );
     }
+
     process.exit(1);
   }
   console.log(`Backend escuchando en http://localhost:${port}`);

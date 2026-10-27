@@ -2,13 +2,12 @@
   "name": "levodopa-assist",
   "private": true,
   "version": "1.0.0",
-  "description": "Frontend Vite + backend Express (local y Vercel Services)",
+  "description": "Frontend Vite + backend Express (Vercel Services) + Supabase",
   "engines": {
     "node": "22.x"
   },
   "scripts": {
     "postinstall": "npm install --prefix webapp/backend && npm install --prefix webapp/frontend",
-    "setup": "node scripts/setup.mjs",
     "dev": "concurrently -k -n backend,frontend -c blue,green \"npm run dev --prefix webapp/backend\" \"npm run dev --prefix webapp/frontend\"",
     "dev:backend": "npm run dev --prefix webapp/backend",
     "dev:frontend": "npm run dev --prefix webapp/frontend",

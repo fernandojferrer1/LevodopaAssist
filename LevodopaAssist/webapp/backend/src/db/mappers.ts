@@ -82,7 +82,7 @@ export function mapMeasurement(
   return measurement;
 }
 
-/** Misma forma que el select histórico de Prisma en GET /patients/:id/measurements. */
+/** Forma del listado en GET /patients/:id/measurements (sin señales crudas). */
 export function mapMeasurementListItem(row: MeasurementRow): MeasurementListItem {
   return {
     id: row.id,

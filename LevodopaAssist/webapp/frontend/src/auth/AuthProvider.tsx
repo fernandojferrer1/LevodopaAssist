@@ -15,7 +15,6 @@ import { INACTIVITY_TIMEOUT_MS } from "./sessionConfig";
 import { isMeasurementBusy, onMeasurementBusyChange } from "./measurementBusy";
 import { setSessionEndMessage } from "./sessionEndMessage";
 
-
 type AuthContextValue = {
   session: Session | null;
   user: User | null;
@@ -44,6 +43,8 @@ export function AuthProvider({
   const [loading, setLoading] = useState(true);
   const onInactivityRef = useRef(onInactivity);
   onInactivityRef.current = onInactivity;
+  /** Evita que un getSession() inicial tardío pise un SIGNED_IN / signIn reciente. */
+  const authEpochRef = useRef(0);
 
   useEffect(() => {
     if (!supabase) {
@@ -52,16 +53,28 @@ export function AuthProvider({
     }
 
     let cancelled = false;
+    const bootEpoch = authEpochRef.current;
+
     supabase.auth.getSession().then(({ data }) => {
-      if (!cancelled) {
-        setSession(data.session);
-        setLoading(false);
-      }
+      if (cancelled) return;
+      // Si ya hubo un evento de auth más nuevo (login), no sobrescribir.
+      if (authEpochRef.current !== bootEpoch) return;
+      setSession(data.session);
+      setLoading(false);
     });
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, next) => {
-      setSession(next);
-      setLoading(false);
+    const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
+      // No llamar métodos de supabase.auth acá (lock interno). Diferir setState
+      // un tick para no bloquear getSession/fetch que corren al montar rutas.
+      setTimeout(() => {
+        if (cancelled) return;
+        authEpochRef.current += 1;
+        setSession(next);
+        setLoading(false);
+        if (event === "SIGNED_OUT") {
+          // noop: el mensaje de cierre lo setea quien dispara el logout
+        }
+      }, 0);
     });
 
     return () => {
@@ -78,7 +91,6 @@ export function AuthProvider({
     });
     return () => setUnauthorizedHandler(null);
   }, [onUnauthorized]);
-
 
   // Timeout de inactividad (pausado si hay medición en curso / sin guardar).
   useEffect(() => {
@@ -100,13 +112,11 @@ export function AuthProvider({
       await supabase!.auth.signOut();
     };
 
-
     const armTimer = () => {
       clearTimer();
       if (isMeasurementBusy()) return;
       timer = setTimeout(() => {
         if (isMeasurementBusy()) {
-          // Sigue ocupado: no cerrar; se rearmará al liberar la medición.
           return;
         }
         void logoutForInactivity();
@@ -143,7 +153,7 @@ export function AuthProvider({
 
   const signIn = useCallback(async (email: string, password: string) => {
     if (!supabase) throw new Error(supabaseConfigError ?? "Supabase no configurado");
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       if (error.message.toLowerCase().includes("invalid login") || error.status === 400) {
         throw new Error("Email o contraseña incorrectos");
@@ -153,6 +163,10 @@ export function AuthProvider({
       }
       throw new Error(error.message || "Email o contraseña incorrectos");
     }
+    // Fijar sesión en React de inmediato (no depender solo del listener async).
+    authEpochRef.current += 1;
+    setSession(data.session);
+    setLoading(false);
   }, []);
 
   const signOut = useCallback(async () => {
@@ -163,6 +177,7 @@ export function AuthProvider({
   const refreshUserFromSession = useCallback(async () => {
     if (!supabase) return null;
     const { data } = await supabase.auth.getSession();
+    authEpochRef.current += 1;
     setSession(data.session);
     return data.session;
   }, []);

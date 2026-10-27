@@ -19,12 +19,13 @@ export function RequireAuth() {
   }
 
   if (!session) {
-    const message = getSessionEndMessage() ?? undefined;
+    const message = getSessionEndMessage();
+    const from = location.pathname + location.search;
     return (
       <Navigate
         to="/login"
         replace
-        state={{ from: location.pathname + location.search, message }}
+        state={message ? { from, message } : { from }}
       />
     );
   }

@@ -1,4 +1,4 @@
-# Dependencias (se reinstalan con npm install)
+# Dependencias
 node_modules/
 
 # Builds
@@ -6,7 +6,7 @@ dist/
 dist-ssr/
 build/
 
-# Vercel
+# Vercel CLI
 .vercel/
 
 # Env y secretos (mantener .env.example versionado)
@@ -17,14 +17,11 @@ build/
 **/.env.*
 !**/.env.example
 
-# SQLite local (legacy / copias)
+# Bases locales residuales
 *.db
 *.db-journal
-**/dev.db
-**/dev.db-journal
 
-# Snapshot redundante del propio proyecto: 173 MB y duplica lo que ya esta
-# versionado aca. Ademas GitHub rechaza archivos de mas de 100 MB.
+# Snapshot del proyecto (demasiado grande para GitHub)
 LevodopaAssist*.zip
 
 # Sistema

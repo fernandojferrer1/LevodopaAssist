@@ -1,4 +1,4 @@
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient, type SupportedStorage } from "@supabase/supabase-js";
 
 const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const publishableKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string | undefined;
@@ -8,7 +8,7 @@ export const supabaseConfigError =
     ? "Faltan VITE_SUPABASE_URL o VITE_SUPABASE_PUBLISHABLE_KEY. Copiá webapp/frontend/.env.example a .env.local y completá los valores (en Vercel: Environment Variables + redeploy)."
     : null;
 
-/** Quita sesiones de versiones anteriores guardadas en localStorage (claves sb-*). */
+/** Quita sesiones de versiones anteriores en localStorage (claves sb-*). Solo al cargar el módulo; no toca sessionStorage. */
 function clearLegacyAuthLocalStorage(): void {
   if (typeof window === "undefined" || !window.localStorage) return;
   const toRemove: string[] = [];
@@ -23,6 +23,20 @@ function clearLegacyAuthLocalStorage(): void {
   }
 }
 
+function sessionStorageAdapter(): SupportedStorage | undefined {
+  if (typeof window === "undefined" || !window.sessionStorage) return undefined;
+  const store = window.sessionStorage;
+  return {
+    getItem: (key) => store.getItem(key),
+    setItem: (key, value) => {
+      store.setItem(key, value);
+    },
+    removeItem: (key) => {
+      store.removeItem(key);
+    },
+  };
+}
+
 if (typeof window !== "undefined") {
   clearLegacyAuthLocalStorage();
 }
@@ -33,6 +47,7 @@ export const supabase: SupabaseClient | null = supabaseConfigError
       auth: {
         persistSession: true,
         autoRefreshToken: true,
-        storage: typeof window !== "undefined" ? window.sessionStorage : undefined,
+        detectSessionInUrl: false,
+        storage: sessionStorageAdapter(),
       },
     });

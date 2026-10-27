@@ -1,7 +1,3 @@
 node_modules/
 dist/
 .env
-prisma/dev.db
-prisma/dev.db-journal
-prisma_legacy/dev.db
-prisma_legacy/dev.db-journal
