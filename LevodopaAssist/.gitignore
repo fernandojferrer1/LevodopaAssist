@@ -1,0 +1,17 @@
+# Dependencias (se reinstalan con npm install)
+node_modules/
+
+# Builds
+dist/
+dist-ssr/
+build/
+
+# Snapshot redundante del propio proyecto: 173 MB y duplica lo que ya esta
+# versionado aca. Ademas GitHub rechaza archivos de mas de 100 MB.
+LevodopaAssist*.zip
+
+# Sistema
+Thumbs.db
+desktop.ini
+.DS_Store
+*.log

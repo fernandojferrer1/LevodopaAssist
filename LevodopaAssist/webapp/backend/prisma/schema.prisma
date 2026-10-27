@@ -1,0 +1,119 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Patient {
+  id          String   @id @default(cuid())
+  fullName    String
+  age         Int
+  nationalId  String?  @unique
+  diagnosis   String?
+  notes       String?
+  extraFields String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  measurements Measurement[]
+  comparisons  Comparison[]
+}
+
+model Measurement {
+  id              String   @id @default(cuid())
+  patientId       String
+  patient         Patient  @relation(fields: [patientId], references: [id])
+  sequenceNumber  Int
+  medicationState String
+  measuredAt      DateTime
+  location        String?
+  notes           String?
+  status          String   @default("completed")
+
+  conNum          Int
+  timerMedicionMs Float
+  conXMinuto      Float
+  peakMax         Float
+  promedioPeaks   Float
+  yyn             Float
+  promedioLthMs   Float
+  promedioBtwMs   Float
+  thresh          Float
+
+  // Métricas derivadas, calculadas en el backend a partir de las contracciones y la señal
+  // cruda (no las manda el firmware). Nullable: no se pueden calcular con menos de 2
+  // contracciones detectadas (decremento/CV) o sin muestra cruda guardada (iemg), y las
+  // mediciones guardadas antes de este cambio no las tienen.
+  amplitudeDecrementPct Float? // % de cambio de amplitud entre el primer y el último tercio de la secuencia (bradicinesia: "sequence effect")
+  durationDecrementPct  Float? // % de cambio de duración de contracción entre el primer y el último tercio de la secuencia
+  durationCvPct         Float? // Coeficiente de variación (%) de la duración de contracción: irregularidad del movimiento
+  peakToBaseRatio       Float? // peakMax / yyn: amplitud de pico normalizada contra el piso de reposo de la sesión
+  iemg                  Float? // Integral aproximada de la señal (mV·ms) sobre toda la ventana: actividad muscular total (tono + fásica)
+
+  // --- Los dos niveles de reposo, que hasta el 16/09/2026 estaban mezclados en `yyn` ---
+  // `yyn` es el PISO: el nivel con el músculo realmente quieto (p10 de la señal). Es una
+  // REFERENCIA - la amplitud de las contracciones y peakToBaseRatio se miden contra él.
+  // `restingToneMv` es el TONO: el promedio entre contracciones ya sin los flancos de subida
+  // y bajada. Es una MEDICIÓN - dice cuánto le falta al músculo para volver del todo.
+  restingToneMv           Float?
+  // (tono - piso) / amplitud, en %. Referencia en sujeto sano: 2,5% / 2,7% / 2,3% sobre las tres
+  // mediciones del 16/09/2026. OJO: es UNA sola persona sana, el mismo día, el mismo electrodo.
+  // Sin registros de pacientes con Parkinson no se sabe si separa las dos poblaciones.
+  incompleteRelaxationPct Float?
+
+  // De dónde salieron las contracciones de esta medición. Importa para no mezclar series:
+  // "firmware" = las contó el equipo en vivo con el umbral de su calibración.
+  // "backend"  = las recalculó el backend sobre rawSamplesJson (ver contractionDetection.ts),
+  //              con el umbral anclado a la amplitud. Es el método preferido desde el
+  //              16/09/2026; el del firmware queda como respaldo cuando la señal grabada no
+  //              se puede analizar (mediciones anteriores a la envolvente, electrodo suelto).
+  detectionSource String  @default("firmware")
+  // Si detectionSource es "firmware", por qué se descartó el recálculo. Ver el campo `reason`
+  // de DetectionResult: sin_contraste | senal_sin_envolvente | muestras_insuficientes.
+  detectionNote   String?
+
+  rawSamplesJson String?
+  createdAt      DateTime @default(now())
+
+  contractions   MeasurementContraction[]
+  comparisonsAsA Comparison[]             @relation("ComparisonA")
+  comparisonsAsB Comparison[]             @relation("ComparisonB")
+
+  @@unique([patientId, sequenceNumber])
+  @@index([patientId, measuredAt])
+}
+
+model MeasurementContraction {
+  id            String      @id @default(cuid())
+  measurementId String
+  measurement   Measurement @relation(fields: [measurementId], references: [id])
+  sequenceIndex Int
+  amplitude     Float
+  durationMs    Float
+
+  // true = la ventana de medición cortó esta contracción antes de que terminara, así que
+  // su amplitude y su durationMs no son medidas reales de la contracción. Queda guardada
+  // (ocurrió, y cuenta para el total y la frecuencia) pero fuera de las métricas de forma.
+  // Ver contractionDetection.ts. Las guardadas antes del 16/09/2026 tienen false por
+  // defecto aunque alguna lo fuera: no hay forma de saberlo retroactivamente sin recalcular.
+  truncated     Boolean     @default(false)
+
+  @@index([measurementId, sequenceIndex])
+}
+
+model Comparison {
+  id             String   @id @default(cuid())
+  patientId      String
+  patient        Patient  @relation(fields: [patientId], references: [id])
+  measurementAId String
+  measurementA   Measurement @relation("ComparisonA", fields: [measurementAId], references: [id])
+  measurementBId String
+  measurementB   Measurement @relation("ComparisonB", fields: [measurementBId], references: [id])
+  metricsJson    String
+  createdAt      DateTime @default(now())
+
+  @@index([patientId])
+}
