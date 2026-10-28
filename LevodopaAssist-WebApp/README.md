@@ -34,7 +34,7 @@ Región de deploy: `pdx1` (Oregon), alineada con Supabase us-west-2.
 
 ```bash
 git clone <repo>
-cd LevodopaAssist          # carpeta que contiene package.json y vercel.json
+cd LevodopaAssist-WebApp   # carpeta que contiene package.json y vercel.json
 
 npm install
 
@@ -74,7 +74,7 @@ En Vercel cargá las cuatro variables principales en Production y Preview. Si ca
 
 ## Deploy
 
-- **Root Directory** del proyecto Vercel = carpeta `LevodopaAssist` (donde está `vercel.json`).
+- **Root Directory** del proyecto Vercel = carpeta `LevodopaAssist-WebApp` (donde está `vercel.json`).
 - Push a `main` → producción automática (si el repo está conectado).
 - Plan Hobby: el **autor del commit** tiene que ser la cuenta dueña del proyecto en Vercel; si no, el deploy se bloquea.
 - Node 22 (`engines` en el `package.json` raíz).

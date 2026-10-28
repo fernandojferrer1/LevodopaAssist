@@ -11,7 +11,7 @@
 ### Layout del monorepo
 
 ```
-LevodopaAssist/                    # raíz operativa (npm run dev unificado)
+LevodopaAssist-WebApp/             # raíz operativa (npm run dev unificado); antes: LevodopaAssist/
   package.json                     # concurrently; NO usa npm workspaces
   scripts/setup.mjs                # crea .env SQLite + prisma migrate/generate
   *.cmd / INSTALACION.md           # flujo Windows local
